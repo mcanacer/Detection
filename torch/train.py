@@ -6,7 +6,6 @@ from retinanet import RetinaNet
 import torch.optim as optim
 import numpy as np
 import wandb
-import os
 
 wandb.login(key="ff9d5723d5542f318135cb8e45cf941976820f40")
 
@@ -17,14 +16,12 @@ run = wandb.init(
     project="RetinaNet",
 )
 
-dataset_dir = "/content/drive/MyDrive/RetinaNet"
-
-detector_path = "/content/drive/MyDrive/RetinaNet/models"
+dataset_dir = "/Users/muhammetcan/Desktop/RetinaNet"
 
 train_dataset = VOC2007DetectionTiny(dataset_dir, "train")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, pin_memory=True)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=2, pin_memory=True, shuffle=True)
 
-backbone = ResNet50(num_classes=20)
+backbone = ResNet18()
 FPN = FPN(backbone.out_channels)
 
 if torch.cuda.is_available():
@@ -58,9 +55,7 @@ for epoch in range(num_epochs):
             cls_loss, reg_loss = detector(inputs, training=True)
         else:
             cls_loss, reg_loss = detector(inputs, training=True)
-        loss = (cls_loss + reg_loss).sum()
-        if loss == 0:
-            continue
+        loss = cls_loss + reg_loss
         torch.nn.utils.clip_grad_norm_(detector.parameters(), 0.1)
         loss.backward()
         optimizer.step()
@@ -73,7 +68,7 @@ for epoch in range(num_epochs):
         "train_loss": loss,
         "epoch": epoch,
         "learning-rate": curr_lr})
-    
+
     torch.save({'model_state_dict':detector.state_dict(),
                      'optimizer_state_dict':optimizer.state_dict(),
                      'scheduler_state_dict':scheduler.state_dict(),

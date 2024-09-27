@@ -52,8 +52,8 @@ class Focal(object):
             pos_mask = matched_idx_per_image >= 0
             num_pos = pos_mask.sum()
 
-            gt_labels = torch.zeros_like(gt_cls_per_image)
-            gt_labels[pos_mask, gt_cls_per_image[matched_idx_per_image[pos_mask]]] = 1.0
+            gt_labels = torch.zeros_like(cls_pred_per_image)
+            gt_labels[pos_mask, gt_cls_per_image[matched_idx_per_image[pos_mask]].long()] = 1.0
 
             valid_idx_per_image = matched_idx_per_image != -2
 
@@ -65,7 +65,7 @@ class Focal(object):
 
             losses.append(loss / max(1, num_pos))
 
-        return losses
+        return sum(losses)
 
 
 class BoxLoss(object):
@@ -75,7 +75,9 @@ class BoxLoss(object):
 
     def __call__(self, box_pred, gt_boxes, anchors, matched_idx):
         losses = []
-        for box_pred_per_image, gt_boxes_per_image, anchors_per_image, matched_idx_per_image in zip(box_pred, gt_boxes, anchors, matched_idx):
+        for box_pred_per_image, gt_boxes_per_image, matched_idx_per_image in zip(box_pred, gt_boxes, matched_idx):
+            anchors_per_image = anchors[0]
+
             pos_mask = matched_idx_per_image >= 0
             num_pos = pos_mask.sum()
 
@@ -92,7 +94,7 @@ class BoxLoss(object):
 
             losses.append(loss / max(1, num_pos))
 
-        return losses
+        return sum(losses)
 
 
 class FocalLoss(nn.Module):
