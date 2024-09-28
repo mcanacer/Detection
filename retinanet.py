@@ -1,13 +1,16 @@
 import torch
 import torch.nn as nn
-from loss import FocalLoss
+from losses import Focal, BoxLoss
+from assigners import ArgmaxAssigner
 import math
 from torchvision.ops.boxes import nms as nms_torch
 from utils import Anchors, BBoxTransform, ClipBoxes
+from similarity_calculators import IouSimilarity
 
 
 def nms(dets, thresh):
     return nms_torch(dets[:, :4], dets[:, 4], thresh)
+
 
 class Regressor(nn.Module):
     def __init__(self, in_channels, num_anchors, num_layers):
@@ -50,7 +53,15 @@ class Classifier(nn.Module):
 
 
 class RetinaNet(nn.Module):
-    def __init__(self, backbone, fpn, feature_size, num_anchors, num_classes, anchor_generator=None):
+    def __init__(self,
+                 backbone,
+                 fpn,
+                 feature_size,
+                 num_anchors,
+                 num_classes,
+                 high_threshold=0.5,
+                 low_threshold=0.4,
+    ):
         super().__init__()
         self.backbone = backbone
         self.fpn = fpn
@@ -58,8 +69,10 @@ class RetinaNet(nn.Module):
         self.num_anchors = num_anchors
         self.num_classes = num_classes
         self.classifier = Classifier(fpn.feature_size, num_anchors, num_classes, 4)
+        self.assigner = ArgmaxAssigner(IouSimilarity(), high_threshold, low_threshold)
         self.regressor = Regressor(fpn.feature_size, num_anchors, 4)
-        self.focalLoss = FocalLoss()
+        self.focalLoss = Focal()
+        self.regLoss = BoxLoss()
         self.regressBoxes = BBoxTransform()
         self.clipBoxes = ClipBoxes()
         self.anchors = Anchors()
@@ -81,7 +94,9 @@ class RetinaNet(nn.Module):
         self.regressor.header.bias.data.fill_(0)
 
     def forward(self, inputs, training=None):
-        images, annotations = inputs
+        images, targets = inputs
+        if training:
+            gt_boxes, gt_classes = targets[:, :, :4], targets[:, :, 4]
 
         features = self.backbone(images)
         features = self.fpn(features)
@@ -92,7 +107,10 @@ class RetinaNet(nn.Module):
         anchors = self.anchors(images)
 
         if training:
-            return self.focalLoss(cls_pred, loc_pred, anchors, annotations)
+            matched_idx = self.assigner(gt_boxes, anchors)
+            cls_loss = self.focalLoss(cls_pred, gt_classes, matched_idx)
+            box_loss = self.regLoss(loc_pred, gt_boxes, anchors, matched_idx)
+            return cls_loss, box_loss
         else:
             transformed_anchors = self.regressBoxes(anchors, loc_pred)
             transformed_anchors = self.clipBoxes(transformed_anchors, images)

@@ -1,11 +1,7 @@
 import torch
 
 
-def encode_boxes(ref_box, proposals, weights):
-    wx = weights[0]
-    wy = weights[1]
-    ww = weights[2]
-    wh = weights[3]
+def encode_boxes(ref_box, proposals):
 
     proposals_x1 = proposals[:, 0].unsqueeze(1)
     proposals_y1 = proposals[:, 1].unsqueeze(1)
@@ -27,10 +23,10 @@ def encode_boxes(ref_box, proposals, weights):
     gt_ctr_x = reference_boxes_x1 + 0.5 * gt_widths
     gt_ctr_y = reference_boxes_y1 + 0.5 * gt_heights
 
-    targets_dx = wx * (gt_ctr_x - ex_ctr_x) / ex_widths
-    targets_dy = wy * (gt_ctr_y - ex_ctr_y) / ex_heights
-    targets_dw = ww * torch.log(gt_widths / ex_widths)
-    targets_dh = wh * torch.log(gt_heights / ex_heights)
+    targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
+    targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
+    targets_dw = torch.log(gt_widths / ex_widths)
+    targets_dh = torch.log(gt_heights / ex_heights)
 
     targets = torch.cat((targets_dx, targets_dy, targets_dw, targets_dh), dim=1)
     return targets
@@ -38,10 +34,6 @@ def encode_boxes(ref_box, proposals, weights):
 
 class BoxCoder(object):
 
-    def __init__(self, weights):
-        self._weights = weights
-
     def encode_single(self, ref_box, proposals):
-        weights = torch.as_tensor(self._weights)
-        targets = encode_boxes(ref_box, proposals, weights)
+        targets = encode_boxes(ref_box, proposals)
         return targets
