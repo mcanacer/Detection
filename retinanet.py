@@ -1,135 +1,149 @@
+import losses
+
 import torch
 import torch.nn as nn
-from losses import Focal, BoxLoss
-from assigners import ArgmaxAssigner
-import math
-from torchvision.ops.boxes import nms as nms_torch
-from utils import Anchors, BBoxTransform, ClipBoxes
-from similarity_calculators import IouSimilarity
+import torch.nn.functional as F
 
 
-def nms(dets, thresh):
-    return nms_torch(dets[:, :4], dets[:, 4], thresh)
+class FeatureExtractor(nn.Module):
 
-
-class Regressor(nn.Module):
-    def __init__(self, in_channels, num_anchors, num_layers):
-        super(Regressor, self).__init__()
-        layers = []
-        for _ in range(num_layers):
-            layers.append(nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1))
-            layers.append(nn.ReLU(True))
-        self.layers = nn.Sequential(*layers)
-        self.header = nn.Conv2d(in_channels, num_anchors * 4, kernel_size=3, stride=1, padding=1)
+    def __init__(
+            self,
+            backbone,
+            fpn,
+            box_head,
+            class_head,
+            feature_map_indexes,
+    ):
+        super(FeatureExtractor, self).__init__()
+        self._backbone = backbone
+        self._fpn = fpn
+        self._box_head = box_head
+        self._class_head = class_head
+        self._feature_map_indexes = feature_map_indexes
 
     def forward(self, inputs):
-        inputs = self.layers(inputs)
-        inputs = self.header(inputs)
-        output = inputs.permute(0, 2, 3, 1)
-        return output.contiguous().view(output.shape[0], -1, 4)
+        inputs = self._backbone(inputs)
+        inputs = self._fpn(inputs)
 
+        inputs = {str(idx): inputs[idx] for idx in self._feature_map_indexes}
 
-class Classifier(nn.Module):
-    def __init__(self, in_channels, num_anchors, num_classes, num_layers):
-        super(Classifier, self).__init__()
-        self.num_anchors = num_anchors
-        self.num_classes = num_classes
-        layers = []
-        for _ in range(num_layers):
-            layers.append(nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1))
-            layers.append(nn.ReLU(True))
-        self.layers = nn.Sequential(*layers)
-        self.header = nn.Conv2d(in_channels, num_anchors * num_classes, kernel_size=3, stride=1, padding=1)
-        self.act = nn.Sigmoid()
+        box_preds = inputs
+        box_preds = {
+            str(idx): self._box_head(box_pred)
+            for idx, box_pred in box_preds.items()
+        }
 
-    def forward(self, inputs):
-        inputs = self.layers(inputs)
-        inputs = self.header(inputs)
-        inputs = self.act(inputs)
-        inputs = inputs.permute(0, 2, 3, 1)
-        output = inputs.contiguous().view(inputs.shape[0], inputs.shape[1], inputs.shape[2], self.num_anchors,
-                                          self.num_classes)
-        return output.contiguous().view(output.shape[0], -1, self.num_classes)
+        class_preds = inputs
+        class_preds = {
+            str(idx): self._class_head(class_pred)
+            for idx, class_pred in class_preds.items()
+        }
+
+        box_preds = [box_preds[idx] for idx in sorted(box_preds.keys())]
+        class_preds = [class_preds[idx] for idx in sorted(class_preds.keys())]
+
+        strides = [2 ** idx for idx in sorted(self._feature_map_indexes)]
+        return box_preds, class_preds, strides
 
 
 class RetinaNet(nn.Module):
-    def __init__(self,
-                 backbone,
-                 fpn,
-                 feature_size,
-                 num_anchors,
-                 num_classes,
-                 high_threshold=0.5,
-                 low_threshold=0.4,
+
+    def __init__(
+            self,
+            model,
+            num_classes,
+            anchor_generator,
+            assigner,
+            box_coder,
+            max_detections=40,
+            iou_threshold=0.5,
+            class_losses=[('focal', 1.0, losses.Focal())],
+            regression_losses=[('l1', 1.0, losses.L1())],
     ):
-        super().__init__()
-        self.backbone = backbone
-        self.fpn = fpn
-        self.feature_size = feature_size
-        self.num_anchors = num_anchors
-        self.num_classes = num_classes
-        self.classifier = Classifier(fpn.feature_size, num_anchors, num_classes, 4)
-        self.assigner = ArgmaxAssigner(IouSimilarity(), high_threshold, low_threshold)
-        self.regressor = Regressor(fpn.feature_size, num_anchors, 4)
-        self.focalLoss = Focal()
-        self.regLoss = BoxLoss()
-        self.regressBoxes = BBoxTransform()
-        self.clipBoxes = ClipBoxes()
-        self.anchors = Anchors()
+        super(RetinaNet, self).__init__()
+        self._model = model
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+        self._num_classes = num_classes
+        self._anchor_generator = anchor_generator
+        self._assigner = assigner
+        self._box_coder = box_coder
 
-        prior = 0.01
+        self._max_detections = max_detections
+        self._iou_threshold = iou_threshold
 
-        self.classifier.header.weight.data.fill_(0)
-        self.classifier.header.bias.data.fill_(-math.log((1.0 - prior) / prior))
+        self._classes_losses = class_losses
+        self._regression_losses = regression_losses
 
-        self.regressor.header.weight.data.fill_(0)
-        self.regressor.header.bias.data.fill_(0)
+    def forward(self, inputs, mode='losses'):
+        return getattr(self, mode)(inputs)
 
-    def forward(self, inputs, training=None):
-        images, targets = inputs
-        if training:
-            gt_boxes, gt_classes = targets[:, :, :4], targets[:, :, 4]
+    def losses(self, inputs):
+        images = inputs[0]  # [N, 3, W, H]
+        gt_boxes = inputs[1]  # [N, T, 4]
+        gt_labels = inputs[2]  # [N, T]
+        gt_weights = inputs[3]  # [N, T]
 
-        features = self.backbone(images)
-        features = self.fpn(features)
+        # box_preds: [N, W, H, Ax4], class_preds: [N, W, H, AxC]
+        box_preds, class_preds, strides = self._model(images)
 
-        cls_pred = torch.cat([self.classifier(feature) for feature in features], dim=1)
-        loc_pred = torch.cat([self.regressor(feature) for feature in features], dim=1)
+        feature_map_sizes = [
+            box_pred.shape[-2:] for box_pred in box_preds
+        ]
 
-        anchors = self.anchors(images)
+        box_preds = cat(box_preds, (-1, 4), 1)  # [N, M, 4]
+        class_preds = cat(class_preds, (-1, self._num_classes), 1)  # [N, M, C]
 
-        if training:
-            matched_idx = self.assigner(gt_boxes, anchors)
-            cls_loss = self.focalLoss(cls_pred, gt_classes, matched_idx)
-            box_loss = self.regLoss(loc_pred, gt_boxes, anchors, matched_idx)
-            return cls_loss, box_loss
-        else:
-            transformed_anchors = self.regressBoxes(anchors, loc_pred)
-            transformed_anchors = self.clipBoxes(transformed_anchors, images)
+        anchors = self._anchor_generator(feature_map_sizes, strides)  # [M, 4]
 
-            scores = torch.max(cls_pred, dim=2, keepdim=True)[0]
+        (
+            target_boxes,  # [N, M, 4]
+            target_boxes_weights,  # [N, M]
+            target_labels,  # [N, M]
+            target_labels_weights,  # [N, M]
+            num_matches,  # [N]
+        ) = self._assigner(
+            anchors,  # [M, 4]
+            gt_boxes,  # [N, T, 4]
+            gt_labels,  # [N, T]
+            gt_weights,  # [N, T]
+        )
 
-            scores_over_thresh = (scores > 0.05)[0, :, 0]
+        l = target_labels - 1
+        l[torch.where(l < 0)] = 0
+        one_hot = F.one_hot(l, self._num_classes)
+        one_hot[torch.where(l == 0)] = 0
 
-            if scores_over_thresh.sum() == 0:
-                return [torch.zeros(0), torch.zeros(0), torch.zeros(0, 4)]
+        target_labels = one_hot # [N, M, C]
+        target_labels *= torch.unsqueeze(target_labels_weights, dim=-1)  # [N, M, C]
 
-            classification = cls_pred[:, scores_over_thresh, :]
-            transformed_anchors = transformed_anchors[:, scores_over_thresh, :]
-            scores = scores[:, scores_over_thresh, :]
+        encoded_target_boxes = self._box_coder.encode(target_boxes, anchors)  # [N, M, 4]
+        decoded_box_preds = self._box_coder.decode(box_preds, anchors)  # [N, M, 4]
 
-            anchors_nms_idx = nms(torch.cat([transformed_anchors, scores], dim=2)[0, :, :], 0.5)
+        for name, weight, fn in self._regression_losses:
+            targets = encoded_target_boxes if fn.encoded else target_boxes
+            preds = decoded_box_preds if fn.decoded else box_preds
 
-            nms_scores, nms_class = classification[0, anchors_nms_idx, :].max(dim=1)
+            loss = fn(preds, targets)  # [N, M]
+            loss *= target_boxes_weights  # [N, M]
+            loss = torch.sum(loss, dim=-1)  # [N]
+            loss = torch.div(loss, num_matches)  # [N]
+            box_loss = loss * weight
 
-            return [nms_scores, nms_class, transformed_anchors[0, anchors_nms_idx, :]]
+        for name, weight, fn in self._classes_losses:
+            loss = fn(class_preds, target_labels.float())  # [N, M, C]
+            loss = torch.sum(loss, dim=-1)  # [N, M]
+            loss *= target_labels_weights
+            loss = torch.sum(loss, dim=-1)  # [N]
+            loss = torch.div(loss, num_matches)  # [N]
+            class_loss = loss * weight
 
+        return box_loss, class_loss
+
+
+def cat(inputs_list, shape, dim):
+    return torch.cat(
+        [inputs.contiguous().view(inputs.shape[0], *shape) for inputs in inputs_list],
+        dim=dim,
+    )
 

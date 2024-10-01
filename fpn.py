@@ -1,48 +1,47 @@
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class FPN(nn.Module):
-    def __init__(self, out_channels, feature_size=256):
-        super().__init__()
-        self.feature_size = feature_size
 
-        self.c3_to_p3 = nn.Conv2d(out_channels[-3], feature_size, kernel_size=1)
-        self.c4_to_p4 = nn.Conv2d(out_channels[-2], feature_size, kernel_size=1)
-        self.c5_to_p5 = nn.Conv2d(out_channels[-1], feature_size, kernel_size=1)
-        self.c5_to_p6 = nn.Conv2d(out_channels[-1], feature_size, kernel_size=3, stride=2, padding=1)
-        self.p6_to_p7 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=2, padding=1)
+    def __init__(self, out_channels, filter_size):
+        super(FPN, self).__init__()
+        c3_size, c4_size, c5_size = out_channels
+        self.p3_in = nn.Conv2d(c3_size, filter_size, kernel_size=1)
+        self.p4_in = nn.Conv2d(c4_size, filter_size, kernel_size=1)
+        self.p5_in = nn.Conv2d(c5_size, filter_size, kernel_size=1)
 
-        self.p7_out = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.p6_out = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.p5_out = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.p4_out = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.p3_out = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        self.p3_out = nn.Conv2d(filter_size, filter_size, kernel_size=3, stride=1, padding=1)
+        self.p4_out = nn.Conv2d(filter_size, filter_size, kernel_size=3, stride=1, padding=1)
+        self.p5_out = nn.Conv2d(filter_size, filter_size, kernel_size=3, stride=1, padding=1)
+
+        self.p6_out = nn.Conv2d(c5_size, filter_size, kernel_size=3, stride=2, padding=1)
 
         self.relu = nn.ReLU()
+        self.p7_out = nn.Conv2d(filter_size, filter_size, kernel_size=3, stride=2, padding=1)
 
-    def _upsample_add(self, x, y):
+    def _upsampled_add(self, x, y):
         _, _, H, W = y.size()
-        return F.interpolate(x, size=(H, W), mode='bilinear') + y
+        return nn.functional.interpolate(x, size=(H, W), mode='nearest') + y
 
     def forward(self, inputs):
         c3, c4, c5 = inputs
 
-        p3 = self.c3_to_p3(c3)
-        p4 = self.c4_to_p4(c4)
-        p5 = self.c5_to_p5(c5)
-        p6 = self.c5_to_p6(c5)
-        p7 = self.p6_to_p7(self.relu(p6))
+        p5_in = self.p5_in(c5)
+        p4_in = self.p4_in(c4)
+        p3_in = self.p3_in(c3)
 
-        p7_out = self.p7_out(p7)
-        p6 = self._upsample_add(p7, p6)
-        p6_out = self.p6_out(p6)
-        p5 = self._upsample_add(p6, p5)
-        p5_out = self.p5_out(p5)
-        p4 = self._upsample_add(p5, p4)
-        p4_out = self.p4_out(p4)
-        p3 = self._upsample_add(p4, p3)
-        p3_out = self.p3_out(p3)
+        p5_out = self.p5_out(p5_in)
+        p4_out = self.p4_out(self._upsampled_add(p5_in, p4_in))
+        p3_out = self.p3_out(self._upsampled_add(self._upsampled_add(p5_in, p4_in), p3_in))
+        p6_out = self.p6_out(c5)
+        p7_out = self.p7_out(self.relu(p6_out))
 
-        return p3_out, p4_out, p5_out, p6_out, p7_out
+        return {
+            3: p3_out,
+            4: p4_out,
+            5: p5_out,
+            6: p6_out,
+            7: p7_out
+        }
+
 

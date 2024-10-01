@@ -1,26 +1,26 @@
-from typing import Optional
-
 import json
 import os
 
 import torch
+import torch.nn.functional as F
 from PIL import Image
-from torch import optim
 from torchvision import transforms
 
 
 class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
     def __init__(
-        self,
-        dataset_dir: str,
-        split: str = "train",
-        download: bool = False,
-        image_size: int = 224,
+            self,
+            dataset_dir,
+            split='train',
+            download=False,
+            image_size=224,
+            max_num_instances=40,
     ):
+        super(VOC2007DetectionTiny, self).__init__()
 
-        super().__init__()
         self.image_size = image_size
+        self._max_num_instances = max_num_instances
 
         if download:
             self._attempt_download(dataset_dir)
@@ -56,7 +56,6 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
     @staticmethod
     def _attempt_download(dataset_dir: str):
-
         import wget
 
         os.makedirs(dataset_dir, exist_ok=True)
@@ -92,8 +91,8 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         image = Image.open(image_path).convert("RGB")
 
         gt_boxes = torch.tensor([ann["xyxy"] for ann in annotations])
-        gt_classes = torch.tensor([self.class_to_idx[ann["name"]] for ann in annotations])
-        gt_classes = gt_classes.unsqueeze(1)
+        gt_labels = torch.tensor([self.class_to_idx[ann["name"]] + 1 for ann in annotations]).to(dtype=torch.long)
+        gt_labels = gt_labels.unsqueeze(1)
 
         original_width, original_height = image.size
 
@@ -119,11 +118,13 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         gt_boxes[:, 2] = torch.clamp(gt_boxes[:, 2] * new_width - _x1, max=self.image_size)
         gt_boxes[:, 3] = torch.clamp(gt_boxes[:, 3] * new_height - _y1, max=self.image_size)
 
-        gt_boxes = torch.cat([gt_boxes, gt_classes], dim=1)
+        gt_boxes /= self.image_size
+        gt_weights = torch.ones_like(gt_labels)
 
-        invalid = (gt_boxes[:, 0] > gt_boxes[:, 2]) | (gt_boxes[:, 1] > gt_boxes[:, 3])
-        gt_boxes[invalid] = -1
+        num_pad = self._max_num_instances - gt_boxes.shape[0]
 
-        gt_boxes = torch.cat([gt_boxes, torch.zeros(40 - len(gt_boxes), 5).fill_(-1.0)])
+        gt_boxes = F.pad(gt_boxes, (0, 0, 0, num_pad))
+        gt_labels = F.pad(gt_labels, (0, 0, 0, num_pad)).squeeze()
+        gt_weights = F.pad(gt_weights, (0, 0, 0, num_pad)).squeeze()
 
-        return image, gt_boxes
+        return image, gt_boxes, gt_labels, gt_weights

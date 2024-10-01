@@ -57,7 +57,7 @@ class MultipleGridAnchor(object):
         anchors = []
 
         for width, height in sizes:
-            level_anchors = self._generators(height, width)
+            level_anchors = self._generators(width, height)
             anchors.append(level_anchors)
 
         return torch.cat(anchors, dim=0)
