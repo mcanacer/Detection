@@ -124,7 +124,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         num_pad = self._max_num_instances - gt_boxes.shape[0]
 
         gt_boxes = F.pad(gt_boxes, (0, 0, 0, num_pad))
-        gt_labels = F.pad(gt_labels, (0, 0, 0, num_pad)).squeeze()
+        gt_labels = F.pad(gt_labels, (0, 0, 0, num_pad), value=1).squeeze()
         gt_weights = F.pad(gt_weights, (0, 0, 0, num_pad)).squeeze()
 
         return image, gt_boxes, gt_labels, gt_weights

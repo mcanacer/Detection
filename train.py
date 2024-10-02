@@ -16,7 +16,7 @@ num_anchors = 9
 dataset_dir = "/Users/muhammetcan/Desktop/RetinaNet"
 
 train_dataset = VOC2007DetectionTiny(dataset_dir, "train")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, pin_memory=True, shuffle=True)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, pin_memory=True)
 
 backbone = ResNet18()
 fpn = FPN(backbone.out_channels, filter_size=256)
@@ -55,7 +55,8 @@ while True:
     for inputs in train_loader:
         box_loss, class_loss = detector(inputs)
         optimizer.zero_grad()
-        loss = torch.sum(class_loss + box_loss, dim=0)
+        loss = box_loss.mean() + class_loss.mean()
+        print(loss)
         loss.backward()
         optimizer.step()
         epoch_loss.append(float(loss))

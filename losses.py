@@ -2,6 +2,13 @@ import torch
 import torch.nn.functional as F
 
 
+def sigmoid_cross_entropy_with_logits(logits, labels):
+    zeros = torch.zeros_like(logits, dtype=torch.float32)
+    condition = logits >= zeros
+    neg_abs_logits = torch.where(condition, -logits, logits)
+    return F.relu(logits) - logits * labels + torch.log1p(torch.exp(neg_abs_logits))
+
+
 class Focal(object):
 
     def __init__(self, gamma=2.0, alpha=0.25):
@@ -18,16 +25,14 @@ class Focal(object):
         '''
 
         p = torch.sigmoid(preds)
-        ce = F.binary_cross_entropy_with_logits(preds, targets, reduction='none')
         p_t = targets * p + (1 - targets) * (1 - p)
+
+        alpha_factor = targets * self._alpha + (1 - targets) * (1 - self._alpha)
         focal_weight = (1.0 - p_t) ** self._gamma
-        loss = ce * focal_weight
 
-        if self._alpha >= 0:
-            alpha_factor = targets * self._alpha + (1 - targets) * (1 - self._alpha)
-            loss = alpha_factor * loss
+        ce = sigmoid_cross_entropy_with_logits(preds, targets)
 
-        return loss
+        return alpha_factor * focal_weight * ce
 
 
 class L1(object):

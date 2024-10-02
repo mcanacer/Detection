@@ -114,7 +114,7 @@ class RetinaNet(nn.Module):
         one_hot = F.one_hot(l, self._num_classes)
         one_hot[torch.where(l == 0)] = 0
 
-        target_labels = one_hot # [N, M, C]
+        target_labels = one_hot  # [N, M, C]
         target_labels *= torch.unsqueeze(target_labels_weights, dim=-1)  # [N, M, C]
 
         encoded_target_boxes = self._box_coder.encode(target_boxes, anchors)  # [N, M, 4]
