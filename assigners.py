@@ -26,16 +26,6 @@ class ArgmaxAssigner(object):
         matched_mask = matched_values >= self._matched_threshold  # [N, M]
         unmatched_mask = matched_values < self._unmatched_threshold  # [N, M]
 
-        matched_mask_indicator = torch.max(
-            F.one_hot(
-                matched_indices,
-                gt_labels.shape[-1],
-            ) * torch.unsqueeze(matched_mask, dim=-1),  # [N, M, T]
-            dim=1,
-        )[0]  # [N, T]
-
-        matched_mask_indicator *= gt_weights
-
         target_boxes = torch.gather(gt_boxes, 1, matched_indices.unsqueeze(2).repeat(1, 1, 4))  # [N, M, 4]
         target_boxes_weights = matched_mask  # [N, M]
 
