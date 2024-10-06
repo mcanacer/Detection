@@ -3,7 +3,6 @@ import losses
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import tensorflow as tf
 
 
 class FeatureExtractor(nn.Module):
@@ -110,12 +109,7 @@ class RetinaNet(nn.Module):
             gt_weights,  # [N, T]
         )
 
-        '''l = target_labels - 1
-        l[torch.where(l < 0)] = 0
-        one_hot = F.one_hot(l, self._num_classes)
-        one_hot[torch.where(l == 0)] = 0'''
-
-        target_labels = torch.from_numpy(tf.one_hot(tf.constant(target_labels), self._num_classes).numpy())  # [N, M, C]
+        target_labels = one_hot(target_labels - 1, self._num_classes)  # [N, M, C]
         target_labels *= torch.unsqueeze(target_labels_weights, dim=-1)  # [N, M, C]
 
         encoded_target_boxes = self._box_coder.encode(target_boxes, anchors)  # [N, M, 4]
@@ -148,3 +142,7 @@ def cat(inputs_list, shape, dim):
         dim=dim,
     )
 
+
+def one_hot(inputs, num_classes):
+    mask = inputs >= 0
+    return F.one_hot(inputs.clamp(min=0), num_classes) * mask.unsqueeze(dim=-1)
