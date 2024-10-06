@@ -79,7 +79,7 @@ class RetinaNet(nn.Module):
         return getattr(self, mode)(inputs)
 
     def losses(self, inputs):
-        images = inputs[0]  # [N, 3, H, 2]
+        images = inputs[0]  # [N, 3, H, W]
         gt_boxes = inputs[1]  # [N, T, 4]
         gt_labels = inputs[2]  # [N, T]
         gt_weights = inputs[3]  # [N, T]
