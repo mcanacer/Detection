@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 
 
 class ArgmaxAssigner(object):
@@ -31,7 +30,7 @@ class ArgmaxAssigner(object):
 
         target_labels = torch.gather(gt_labels, 1, matched_indices)  # [N, M]
         target_labels *= matched_mask
-        target_labels_weights = matched_mask + unmatched_mask  # [N, M]
+        target_labels_weights = matched_mask | unmatched_mask  # [N, M]
 
         num_matches = matched_mask.sum(dim=1).clamp(min=1)  # [N]
 
