@@ -126,7 +126,7 @@ class RetinaNet(nn.Module):
             box_loss = loss * weight
 
         for name, weight, fn in self._classes_losses:
-            loss = fn(class_preds, target_labels.float())  # [N, M, C]
+            loss = fn(class_preds, target_labels)  # [N, M, C]
             loss = torch.sum(loss, dim=-1)  # [N, M]
             loss *= target_labels_weights
             loss = torch.sum(loss, dim=-1)  # [N]
