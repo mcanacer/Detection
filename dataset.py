@@ -59,8 +59,10 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         image_path = os.path.join(self.dataset_dir, image_path)
         image = Image.open(image_path).convert("RGB")
 
-        gt_boxes = torch.tensor([ann["xyxy"] for ann in annotations])
-        gt_labels = torch.tensor([self.class_to_idx[ann["name"]] + 1 for ann in annotations]).to(dtype=torch.long)
+        gt_boxes = torch.tensor([ann["xyxy"] for ann in annotations])  # [number of box in image, 4]
+
+        # gt_labels: [number of object in image]
+        gt_labels = torch.tensor([self.class_to_idx[ann["name"]] + 1 for ann in annotations])
         gt_labels = gt_labels.unsqueeze(1)
 
         original_width, original_height = image.size
@@ -69,7 +71,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
         gt_boxes /= normalize_tens.unsqueeze(0)
 
-        image = self.image_transform(image)
+        image = self.image_transform(image)  # [3, H, W]
 
         if self.image_size is not None:
             if original_height >= original_width:
