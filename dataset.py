@@ -14,7 +14,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
             dataset_dir,
             split='train',
             download=False,
-            image_size=320,
+            image_size=512,
             max_num_instances=40,
     ):
         super(VOC2007DetectionTiny, self).__init__()
@@ -54,33 +54,6 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         ]
         self.image_transform = transforms.Compose(_transforms)
 
-    @staticmethod
-    def _attempt_download(dataset_dir: str):
-        import wget
-
-        os.makedirs(dataset_dir, exist_ok=True)
-
-        wget.download(
-            "https://web.eecs.umich.edu/~justincj/data/VOCtrainval_06-Nov-2007.tar",
-            out=dataset_dir,
-        )
-        wget.download(
-            "https://web.eecs.umich.edu/~justincj/data/voc07_train.json",
-            out=dataset_dir,
-        )
-        wget.download(
-            "https://web.eecs.umich.edu/~justincj/data/voc07_val.json",
-            out=dataset_dir,
-        )
-
-        import tarfile
-
-        voc_tar = tarfile.open(
-            os.path.join(dataset_dir, "VOCtrainval_06-Nov-2007.tar")
-        )
-        voc_tar.extractall(dataset_dir)
-        voc_tar.close()
-
     def __len__(self):
         return len(self.instances)
 
@@ -98,7 +71,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
         normalize_tens = torch.tensor([original_width, original_height, original_width, original_height])
 
-        gt_boxes /= normalize_tens[None, :]
+        gt_boxes /= normalize_tens.unsqueeze(0)
 
         image = self.image_transform(image)
 
@@ -118,7 +91,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         gt_boxes[:, 2] = torch.clamp(gt_boxes[:, 2] * new_width - _x1, max=self.image_size)
         gt_boxes[:, 3] = torch.clamp(gt_boxes[:, 3] * new_height - _y1, max=self.image_size)
 
-        gt_boxes /= self.image_size
+        gt_boxes /= torch.tensor([self.image_size, self.image_size, self.image_size, self.image_size]).unsqueeze(0)
         gt_weights = torch.ones_like(gt_labels)
 
         num_pad = self._max_num_instances - gt_boxes.shape[0]

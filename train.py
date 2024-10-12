@@ -29,7 +29,7 @@ class_head = ConvolutionalHead(num_repeats=4, filter_size=256, out_filters=num_a
 scales = [2 ** (i/3) for i in range(3)]
 aspect_ratios = [0.5, 1, 2]
 
-anchor_generator = MultipleGridAnchor(scales, aspect_ratios)
+anchor_generator = MultipleGridAnchor(scales, aspect_ratios, scale=15.0)
 
 iou_similarity = IouSimilarity()
 

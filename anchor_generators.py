@@ -5,8 +5,8 @@ import numpy as np
 
 class GridAnchorGenerator(object):
 
-    def __init__(self, scales, aspect_ratios, max_clip_value=0.99):
-        self._scales = scales
+    def __init__(self, scales, aspect_ratios, scale=1.0, max_clip_value=0.99):
+        self._scales = list(map(lambda x: x * scale, scales))
         self._aspect_ratios = aspect_ratios
         self._max_clip_value = max_clip_value
 
@@ -48,10 +48,11 @@ class GridAnchorGenerator(object):
 
 class MultipleGridAnchor(object):
 
-    def __init__(self, scales, aspect_ratios, max_clip_value=0.99):
+    def __init__(self, scales, aspect_ratios, scale=1.0, max_clip_value=0.99):
         self._generators = GridAnchorGenerator(
             scales,
             aspect_ratios,
+            scale,
             max_clip_value
         )
 

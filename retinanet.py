@@ -3,6 +3,7 @@ import losses
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 
 
 class FeatureExtractor(nn.Module):
@@ -134,6 +135,49 @@ class RetinaNet(nn.Module):
             class_loss = loss * weight
 
         return box_loss, class_loss
+
+    def predict(self, inputs):
+        images = inputs[0]  # [N, 3, H, W]
+
+        # box_preds: [N, Ax4, H, W], class_preds: [N, AxC, H, W]
+        box_preds, class_preds, strides = self._model(images)
+
+        feature_map_sizes = [
+            box_pred.shape[-2:] for box_pred in box_preds
+        ]
+
+        anchors = self._anchor_generator(feature_map_sizes, strides)
+
+        box_preds = cat(box_preds, (-1, 4), 1)  # [N, M, 4]
+        class_preds = cat(class_preds, (-1, self._num_classes), 1)  # [N, M, C]
+
+        class_preds = torch.sigmoid(class_preds)
+
+        class_preds = torch.reshape(class_preds, (class_preds.shape[0], -1))  # [N, MxC]
+        _, top_indices = torch.topk(class_preds, self._max_detections, sorted=False)  # [N, MD]
+
+        indices = top_indices // self._num_classes  # [N, MD]
+        classes = top_indices % self._num_classes  # [N, MD]
+
+        class_scores = torch.gather(class_preds, 1, top_indices)  # [N, MD]
+
+        box_preds = torch.gather(box_preds, 1, indices)  # [N, MD, 4]
+        anchor_boxes = torch.gather(anchors, 1, indices)  # [N, MD, 4]
+
+        box_preds = self._box_coder.decode(box_preds, anchor_boxes)  # [N, MD, 4]
+
+        box_preds = torch.reshape(box_preds, (self._max_detections, 4))  # [MD, 4]
+        classes = torch.reshape(classes, self._max_detections)  # [MD]
+        class_scores = torch.reshape(class_scores, self._max_detections)  # [MD]
+
+        selected_indices = torchvision.ops.nms(box_preds, class_scores, self._iou_threshold)
+
+        box_preds = torch.gather(box_preds, selected_indices)
+        class_preds = torch.gather(classes, selected_indices)
+
+        selected_scores = torch.gather(class_scores, selected_indices)
+
+        return box_preds, selected_scores, class_preds
 
 
 def cat(inputs_list, shape, dim):
