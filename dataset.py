@@ -13,7 +13,6 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
             self,
             dataset_dir,
             split='train',
-            download=False,
             image_size=512,
             max_num_instances=40,
     ):
@@ -21,9 +20,6 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
         self.image_size = image_size
         self._max_num_instances = max_num_instances
-
-        if download:
-            self._attempt_download(dataset_dir)
 
         voc_classes = [
             "aeroplane", "bicycle", "bird", "boat", "bottle", "bus",
