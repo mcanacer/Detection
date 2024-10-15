@@ -11,7 +11,7 @@ from box_coders import OffsetBoxCoder
 import numpy as np
 
 num_classes = 20
-num_anchors = 9
+num_anchors = 3
 
 dataset_dir = "/Users/muhammetcan/Desktop/RetinaNet"
 
@@ -26,10 +26,10 @@ feature_map_indexes = [i for i in range(3, 8)]
 box_head = ConvolutionalHead(num_repeats=4, filter_size=256, out_filters=num_anchors*4)
 class_head = ConvolutionalHead(num_repeats=4, filter_size=256, out_filters=num_anchors*num_classes)
 
-scales = [2 ** (i/3) for i in range(3)]
+scales = [1]
 aspect_ratios = [0.5, 1, 2]
 
-anchor_generator = MultipleGridAnchor(scales, aspect_ratios, scale=15.0)
+anchor_generator = MultipleGridAnchor(scales, aspect_ratios, scale=14.5)
 
 iou_similarity = IouSimilarity()
 

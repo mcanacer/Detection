@@ -123,7 +123,7 @@ class RetinaNet(nn.Module):
             loss = fn(preds, targets)  # [N, M]
             loss *= target_boxes_weights  # [N, M]
             loss = torch.sum(loss, dim=-1)  # [N]
-            loss = torch.div(loss, num_matches)  # [N]
+            loss = divide_no_nan(loss, num_matches)  # [N]
             box_loss = loss * weight
 
         for name, weight, fn in self._classes_losses:
@@ -131,7 +131,7 @@ class RetinaNet(nn.Module):
             loss = torch.sum(loss, dim=-1)  # [N, M]
             loss *= target_labels_weights
             loss = torch.sum(loss, dim=-1)  # [N]
-            loss = torch.div(loss, num_matches)  # [N]
+            loss = divide_no_nan(loss, num_matches)  # [N]
             class_loss = loss * weight
 
         return box_loss, class_loss
@@ -190,3 +190,13 @@ def cat(inputs_list, shape, dim):
 def one_hot(inputs, num_classes):
     mask = inputs >= 0
     return F.one_hot(inputs.clamp(min=0), num_classes) * mask.unsqueeze(dim=-1)
+
+
+def divide_no_nan(x, y):
+    zero = torch.zeros((), dtype=y.dtype)
+    one = torch.ones((), dtype=y.dtype)
+
+    mask = y == zero
+
+    y = torch.where(mask, one, y)
+    return torch.where(mask, zero, x / y)

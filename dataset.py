@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
+from boxops import area
 
 
 class VOC2007DetectionTiny(torch.utils.data.Dataset):
@@ -91,6 +92,9 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
         gt_boxes /= torch.tensor([self.image_size, self.image_size, self.image_size, self.image_size]).unsqueeze(0)
         gt_weights = torch.ones_like(gt_labels)
+
+        mask = area(gt_boxes) >= 0.01
+        gt_weights *= mask.unsqueeze(-1)
 
         num_pad = self._max_num_instances - gt_boxes.shape[0]
 

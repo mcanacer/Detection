@@ -32,7 +32,7 @@ class ArgmaxAssigner(object):
         target_labels *= matched_mask
         target_labels_weights = matched_mask | unmatched_mask  # [N, M]
 
-        num_matches = matched_mask.sum(dim=1).clamp(min=1)  # [N]
+        num_matches = matched_mask.sum(dim=1)  # [N]
 
         return target_boxes, target_boxes_weights, target_labels, target_labels_weights, num_matches
 
