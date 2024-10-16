@@ -36,10 +36,10 @@ class GridAnchorGenerator(object):
         heights, y_centers = meshgrid(heights, y_centers)
         widths, x_centers = meshgrid(widths, x_centers)
 
-        xmin = (x_centers - widths) / width
-        ymin = (y_centers - heights) / height
-        xmax = (x_centers + widths) / width
-        ymax = (y_centers + heights) / height
+        xmin = (x_centers - 0.5 * widths) / width
+        ymin = (y_centers - 0.5 * heights) / height
+        xmax = (x_centers + 0.5 * widths) / width
+        ymax = (y_centers + 0.5 * heights) / height
 
         boxes = torch.stack([xmin, ymin, xmax, ymax], dim=-1)
         boxes = torch.clip(boxes, min=0.0, max=self._max_clip_value)
