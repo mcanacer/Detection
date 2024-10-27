@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
+import math
 
 class FeatureExtractor(nn.Module):
 
@@ -26,6 +27,21 @@ class FeatureExtractor(nn.Module):
         self._box_head = box_head
         self._class_head = class_head
         self._feature_map_indexes = feature_map_indexes
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.normal_(m.weight, 0, 0.01)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+
+        prior = 0.01
+
+        self._class_head._out_conv.weight.data.fill_(0)
+        self._class_head._out_conv.bias.data.fill_(-math.log((1.0 - prior) / prior))
+
+        self._box_head._out_conv.weight.data.fill_(0)
+        self._box_head._out_conv.bias.data.fill_(0)
 
     def forward(self, inputs, training=None):
         inputs = self._backbone(inputs)

@@ -14,10 +14,10 @@ import numpy as np
 num_classes = 90
 num_anchors = 9
 
-dataset_dir = "/Users/muhammetcan/Desktop/RetinaNet/val2017"
+dataset_dir = "/Users/muhammetcan/Desktop/Detection/val2017"
 
-train_dataset = CocoDataset(dataset_dir, "/Users/muhammetcan/Desktop/RetinaNet/annotations/instances_val2017.json")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, pin_memory=True)
+train_dataset = CocoDataset(dataset_dir, "/Users/muhammetcan/Desktop/Detection/annotations/instances_val2017.json")
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, pin_memory=True)
 
 backbone = ResNet50()
 fpn = FPN(backbone.out_channels, filter_size=512)
@@ -58,6 +58,8 @@ while True:
 
     for inputs in train_loader:
         box_loss, class_loss = detector(inputs)
+        print(box_loss.mean())
+        print(class_loss.mean())
         optimizer.zero_grad()
         loss = box_loss.mean() + class_loss.mean()
         print(loss)
