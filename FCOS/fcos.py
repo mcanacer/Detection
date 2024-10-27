@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import losses
-from boxops import scale
+from boxops import scale, normalize
 
 import math
 
@@ -37,9 +37,6 @@ class FeatureExtractor(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.normal_(m.weight, 0, 0.01)
-                # m.bias.data.zero_(0)
-                # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                # m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
@@ -172,6 +169,8 @@ class FCOS(nn.Module):
 
         target_labels = one_hot(target_labels - 1, self._num_classes)  # [N, M, C]
         target_labels *= target_weights.unsqueeze(dim=-1)
+
+        target_boxes = normalize(target_boxes, image_height, image_width)
 
         encoded_target_boxes = self._box_coder.encode(target_boxes, locations)
         decoded_box_preds = self._box_coder.decode(box_preds, locations)

@@ -63,7 +63,7 @@ while True:
     epoch_loss = []
 
     for inputs in train_loader:
-        box_loss, class_loss, ctr_loss = detector(inputs)
+        class_loss, box_loss, ctr_loss = detector(inputs)
         print(box_loss.sum())
         print(class_loss.sum())
         print(ctr_loss.sum())

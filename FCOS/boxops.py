@@ -19,3 +19,5 @@ def scale(boxes, height, width):
     return boxes * torch.tensor([width, height, width, height], dtype=torch.float32)
 
 
+def normalize(boxes, height, width):
+    return boxes / torch.tensor([width, height, width, height], dtype=torch.float32)
