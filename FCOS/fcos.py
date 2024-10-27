@@ -170,10 +170,10 @@ class FCOS(nn.Module):
         target_labels = one_hot(target_labels - 1, self._num_classes)  # [N, M, C]
         target_labels *= target_weights.unsqueeze(dim=-1)
 
-        target_boxes = normalize(target_boxes, image_height, image_width)
-
         encoded_target_boxes = self._box_coder.encode(target_boxes, locations)
         decoded_box_preds = self._box_coder.decode(box_preds, locations)
+
+        encoded_target_boxes = normalize(encoded_target_boxes, image_height, image_width)
 
         for name, weight, fn in self._reg_loss:
             targets = encoded_target_boxes if fn.encoded else target_boxes
