@@ -46,8 +46,8 @@ class FeatureExtractor(nn.Module):
         self._class_head._out_conv.weight.data.fill_(0)
         self._class_head._out_conv.bias.data.fill_(-math.log((1.0 - prior) / prior))
 
-        self._box_head._out_conv.weight.data.fill_(0)
-        self._box_head._out_conv.bias.data.fill_(0)
+        # self._box_head._out_conv.weight.data.fill_(0)
+        # self._box_head._out_conv.bias.data.fill_(0)
 
     def forward(self, inputs, training=None):
         inputs = self._backbone(inputs)
@@ -174,6 +174,8 @@ class FCOS(nn.Module):
         decoded_box_preds = self._box_coder.decode(box_preds, locations)
 
         encoded_target_boxes = normalize(encoded_target_boxes, image_height, image_width)
+
+        print(num_matches)
 
         for name, weight, fn in self._reg_loss:
             targets = encoded_target_boxes if fn.encoded else target_boxes

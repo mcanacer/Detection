@@ -1,5 +1,5 @@
 import torch
-from dataset import VOC2007DetectionTiny
+from dataset import VOC2007DetectionTiny, CocoDataset
 from backbone import *
 from fpn import FPN
 from fcos import FeatureExtractor, FCOS
@@ -10,13 +10,13 @@ from assigners import FCOSAssigner
 from box_coders import LTRB
 import numpy as np
 
-num_classes = 20
+num_classes = 90
 
-dataset_dir = "/Users/muhammetcan/Desktop/Detection"
+dataset_dir = "/Users/muhammetcan/Desktop/Detection/val2017"
 
-train_dataset = VOC2007DetectionTiny(dataset_dir, 'train')
+train_dataset = CocoDataset(dataset_dir, "/Users/muhammetcan/Desktop/Detection/annotations/instances_val2017.json")
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, pin_memory=True)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, pin_memory=True)
 
 backbone = ResNet50()
 fpn = FPN(backbone.out_channels, filter_size=256)
