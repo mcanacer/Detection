@@ -14,7 +14,7 @@ class CocoDataset(torch.utils.data.Dataset):
     def __init__(self,
                  dataset_dir,
                  annotation_file_path,
-                 image_size=416,
+                 image_size=512,
                  max_num_instances=40):
 
         super(CocoDataset, self).__init__()

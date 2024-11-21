@@ -47,14 +47,17 @@ class ConvolutionalTower(nn.Module):
                 return inputs + outputs
             else:
                 return outputs
-        for i, (conv, bn) in enumerate(zip(self._conv_layers, self._bn_layers)):
-            inputs = conv_norm_act(
-                conv,
-                bn,
-                inputs,
-                i > 0 and self._use_residual,
-            )
-        return inputs
+        outputs = {}
+        for idx, inputs in inputs.items():
+            for i, (conv, bn) in enumerate(zip(self._conv_layers, self._bn_layers)):
+                inputs = conv_norm_act(
+                    conv,
+                    bn,
+                    inputs,
+                    i > 0 and self._use_residual,
+                )
+            outputs[idx] = inputs
+        return outputs
 
 
 

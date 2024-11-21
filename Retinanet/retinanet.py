@@ -51,10 +51,7 @@ class FeatureExtractor(nn.Module):
 
         box_preds = inputs
 
-        box_preds = {
-            str(idx): self._box_tower(box_pred, training=training)
-            for idx, box_pred in box_preds.items()
-        }
+        box_preds = self._box_tower(box_preds, training=training)
 
         box_preds = {
             str(idx): self._box_head(box_pred, training=training)
@@ -63,10 +60,7 @@ class FeatureExtractor(nn.Module):
 
         class_preds = inputs
 
-        class_preds = {
-            str(idx): self._class_tower(class_pred, training=training)
-            for idx, class_pred in class_preds.items()
-        }
+        class_preds = self._class_tower(class_preds, training=training)
 
         class_preds = {
             str(idx): self._class_head(class_pred)

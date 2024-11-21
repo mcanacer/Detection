@@ -19,16 +19,16 @@ dataset_dir = "/Users/muhammetcan/Desktop/Detection/val2017"
 train_dataset = CocoDataset(dataset_dir, "/Users/muhammetcan/Desktop/Detection/annotations/instances_val2017.json")
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, pin_memory=True)
 
-backbone = ResNet50()
+backbone = ResNet101()
 fpn = FPN(backbone.out_channels, filter_size=512)
 
 feature_map_indexes = [i for i in range(3, 8)]
 
-box_tower = ConvolutionalTower(num_repeats=3, filter_size=512, survival_prob=0.5)
-class_tower = ConvolutionalTower(num_repeats=3, filter_size=512, survival_prob=0.5)
+box_tower = ConvolutionalTower(num_repeats=4, filter_size=512, survival_prob=0.5)
+class_tower = ConvolutionalTower(num_repeats=4, filter_size=512, survival_prob=0.5)
 
-box_head = ConvolutionalHead(num_repeats=3, filter_size=512, out_filters=num_anchors*4, survival_prob=0.5)
-class_head = ConvolutionalHead(num_repeats=3, filter_size=512, out_filters=num_anchors*num_classes, survival_prob=0.5)
+box_head = ConvolutionalHead(num_repeats=4, filter_size=512, out_filters=num_anchors*4, survival_prob=0.5)
+class_head = ConvolutionalHead(num_repeats=4, filter_size=512, out_filters=num_anchors*num_classes, survival_prob=0.5)
 
 scales = [2 ** (i/3) for i in range(3)]
 aspect_ratios = [0.5, 1, 2]
