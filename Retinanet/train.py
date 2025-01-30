@@ -40,9 +40,9 @@ def main(config_path, args):
 
             run.log(
                 {
-                    "reg_loss": float(losses['l1'].mean()),
-                    "class_loss": float(losses['focal'].mean()),
-                    "box_loss": float(losses['Iou'].mean()),
+                    "reg_loss": float(reg_loss.mean()),
+                    "class_loss": float(class_loss.mean()),
+                    "box_loss": float(box_loss.mean()),
                     "total_loss": float(loss),
                     "epoch": epoch,
                     "learning-rate": curr_lr

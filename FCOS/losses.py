@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import boxops
 
 
 def sigmoid_cross_entropy_with_logits(logits, labels):
@@ -64,6 +65,30 @@ class CenternessLoss(object):
         return F.binary_cross_entropy_with_logits(preds, targets, reduction='none').sum(dim=-1)
 
 
+class IOULoss(object):
 
+    def __init__(self, name='ciou'):
+        assert name in ['iou', 'giou', 'diou', 'ciou']
+
+        self._fn = getattr(boxops, name)
+
+    @property
+    def encoded(self):
+        return False
+
+    @property
+    def decoded(self):
+        return True
+
+    def __call__(self, preds, targets):
+        '''
+        Args:
+            preds: [N, M, 4],
+            targets: [N, M, 4],
+        return:
+            loss: [N, M]
+        '''
+
+        return 1.0 - self._fn(preds, targets)
 
 

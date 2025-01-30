@@ -3,36 +3,40 @@ import torch
 
 class LTRB(object):
 
-    def encode(self, boxes, locations):
+    def encode(self, boxes, points):
         '''
         Args:
             boxes: [N, M, 4]
-            locations [M, 2]
+            points [M, 2]
         Return
             targets: [N, M, 4]
         '''
 
         mins, maxs = torch.split(boxes, 2, dim=-1)
 
-        lt = locations.unsqueeze(dim=0) - mins
-        rb = maxs - locations.unsqueeze(dim=0)
+        indices = torch.unsqueeze(points, dim=0)
+
+        lt = indices - mins
+        rb = maxs - indices
 
         return torch.cat((lt, rb), dim=-1)
 
 
-    def decode(self, preds, locations):
+    def decode(self, preds, points):
         '''
         Args:
             preds: [N, M, 4]
-            locations: [M, 2]
+            points: [M, 2]
         Return:
             targets: [N, M, 2]
         '''
 
         lt, rb = torch.split(preds, 2, dim=-1)
 
-        mins = locations.unsqueeze(dim=0) - lt
-        maxs = rb - locations.unsqueeze(dim=0)
+        indices = torch.unsqueeze(points, dim=0)
+
+        mins = indices - lt
+        maxs = rb + indices
 
         return torch.cat((mins, maxs), dim=-1)
 

@@ -8,7 +8,7 @@ class StochasticDepth(nn.Module):
         self._survival_prob = survival_prob
 
     def forward(self, inputs, training=None):
-        if self._survival_prob is None or self._survival_prob == 0 or not training:
+        if self._survival_prob is None or self._survival_prob == 0 or not self.training: # changed
             return inputs
 
         shape = [inputs.shape[0]] + [1] * (inputs.ndim - 1)
@@ -16,7 +16,6 @@ class StochasticDepth(nn.Module):
         noise = noise.bernoulli(self._survival_prob)
 
         return torch.div(inputs, self._survival_prob) * noise
-
 
 class ConvolutionalTower(nn.Module):
     def __init__(self, num_repeats, filter_size, survival_prob, use_residual=True):
@@ -26,35 +25,28 @@ class ConvolutionalTower(nn.Module):
         self._survival_prob = survival_prob
         self._use_residual = use_residual
 
-        self._stochastic_depth = StochasticDepth(survival_prob)
+        self._layers = self._make_layers()
 
-        self._make_layers()
-
-        self.relu = nn.ReLU()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
     def _make_layers(self):
-        self._conv_layers = []
-        self._bn_layers = []
-        for _ in range(self._num_repeats):
-            self._conv_layers.append(nn.Conv2d(self._filter_size, self._filter_size, kernel_size=3, stride=1, padding=1))
-            self._bn_layers.append(nn.BatchNorm2d(self._filter_size))
+        layers = []
+        for i in range(self._num_repeats):
+            layers.append(nn.Conv2d(self._filter_size, self._filter_size, kernel_size=3, stride=1, padding=1))
+            layers.append(nn.ReLU())
+        return nn.Sequential(*layers)
 
-    def forward(self, inputs, training=None):
-        def conv_norm_act(conv, bn, inputs, use_residual):
-            outputs = self.relu(bn(conv(inputs)))
-            if use_residual:
-                outputs = self._stochastic_depth(outputs, training=training)
-                return inputs + outputs
-            else:
-                return outputs
-        for i, (conv, bn) in enumerate(zip(self._conv_layers, self._bn_layers)):
-            inputs = conv_norm_act(
-                conv,
-                bn,
-                inputs,
-                i > 0 and self._use_residual,
-            )
-        return inputs
+    def forward(self, inputs):
+        outputs = {}
+        for idx, inputs in inputs.items():
+            outputs[idx] = self._layers(inputs)
+        return outputs
 
 
 
