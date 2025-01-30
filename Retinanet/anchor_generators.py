@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import collections
 
 
 class GridAnchorGenerator(object):
@@ -45,6 +46,10 @@ class GridAnchorGenerator(object):
         boxes = torch.clip(boxes, min=0.0, max=self._max_clip_value)
         return boxes
 
+Anchors = collections.namedtuple(
+    'Anchors', ['boxes', 'sizes', 'strides', 'nums', 'indices', 'total']
+)
+
 
 class MultipleGridAnchor(object):
 
@@ -57,79 +62,25 @@ class MultipleGridAnchor(object):
         )
 
     def __call__(self, sizes, strides):
-        anchors = []
+        anchors, indices = [], []
 
+        start = 0
         for height, width in sizes:
             level_anchors = self._generators(height, width)
+            num, _ = level_anchors.shape
+
             anchors.append(level_anchors)
+            indices.append((start, start + num))
 
-        return torch.cat(anchors, dim=0)
+            start += num
 
-
-class Anchors(nn.Module):
-    def __init__(self, pyramid_levels=None, strides=None, sizes=None, ratios=None, scales=None):
-        super().__init__()
-        if pyramid_levels is None:
-            self.pyramid_levels = [3, 4, 5, 6, 7]
-        if strides is None:
-            self.strides = [2 ** s for s in self.pyramid_levels]
-        if sizes is None:
-            self.sizes = [2 ** (s + 2) for s in self.pyramid_levels]
-        if ratios is None:
-            self.ratios = [1]
-        if scales is None:
-            self.scales = [1]
-
-    def forward(self, images):
-        image_shape = images.shape[-2:]
-        image_shape = np.array(image_shape)
-        image_shapes = [(image_shape + 2 ** i - 1) // 2 ** i for i in self.pyramid_levels]
-
-        all_anchors = np.zeros((0, 4)).astype(np.float32)
-
-        for idx, p in enumerate(self.pyramid_levels):
-            anchors = generate_anchors(base_size=self.sizes[idx], ratios=self.ratios, scales=self.scales)
-            shifted_anchors = shift(image_shapes[idx], self.strides[idx], anchors)
-            all_anchors = np.append(all_anchors, shifted_anchors, axis=0)
-
-        anchors = torch.from_numpy(all_anchors.astype(np.float32))
-        if torch.cuda.is_available():
-            anchors = anchors.cuda()
-        return anchors
+        return Anchors(
+            boxes=torch.cat(anchors, dim=0),
+            sizes=sizes,
+            strides=strides,
+            nums=[self._generators.num_anchors_per_location()] * len(sizes),
+            indices=indices,
+            total=indices[-1][-1]
+        )
 
 
-def generate_anchors(base_size, ratios, scales):
-    num_anchors = len(ratios) * len(scales)
-
-    anchors = np.zeros((num_anchors, 4))
-
-    anchors[:, 2:] = base_size * np.tile(scales, (2, len(ratios))).T
-
-    areas = anchors[:, 2] * anchors[:, 3]
-
-    anchors[:, 2] = np.sqrt(areas / np.repeat(ratios, len(scales)))
-    anchors[:, 3] = anchors[:, 2] * np.repeat(ratios, len(scales))
-
-    anchors[:, 0::2] -= np.tile(anchors[:, 2] * 0.5, (2, 1)).T
-    anchors[:, 1::2] -= np.tile(anchors[:, 3] * 0.5, (2, 1)).T
-
-    return anchors
-
-
-def shift(shape, stride, anchors):
-    shift_x = (np.arange(0, shape[0]) + 0.5) * stride
-    shift_y = (np.arange(0, shape[1]) + 0.5) * stride
-
-    shift_x, shift_y = np.meshgrid(shift_x, shift_y)
-
-    shifts = np.vstack((
-        shift_x.ravel(), shift_y.ravel(),
-        shift_x.ravel(), shift_y.ravel()
-    )).transpose()
-
-    A = anchors.shape[0]
-    K = shifts.shape[0]
-    all_anchors = (anchors.reshape((1, A, 4)) + shifts.reshape((1, K, 4)).transpose((1, 0, 2)))
-    all_anchors = all_anchors.reshape((K*A, 4))
-
-    return all_anchors
