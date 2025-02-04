@@ -4,7 +4,7 @@ from towers import StochasticDepth
 
 
 class ConvolutionalHead(nn.Module):
-    def __init__(self, num_repeats, filter_size, out_filters, survival_prob, use_residual=True):
+    def __init__(self, num_repeats, filter_size, out_filters, survival_prob=0.5, use_residual=True):
         super(ConvolutionalHead, self).__init__()
         self._num_repeats = num_repeats
         self._filter_size = filter_size

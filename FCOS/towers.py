@@ -18,7 +18,7 @@ class StochasticDepth(nn.Module):
         return torch.div(inputs, self._survival_prob) * noise
 
 class ConvolutionalTower(nn.Module):
-    def __init__(self, num_repeats, filter_size, survival_prob, use_residual=True):
+    def __init__(self, num_repeats, filter_size, survival_prob=0.5, use_residual=True):
         super(ConvolutionalTower, self).__init__()
         self._num_repeats = num_repeats
         self._filter_size = filter_size
