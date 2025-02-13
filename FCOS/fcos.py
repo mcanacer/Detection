@@ -35,12 +35,6 @@ class FeatureExtractor(nn.Module):
 
         self._feature_map_indexes = feature_map_indexes
 
-        for layer in self.modules():
-            if isinstance(layer, nn.BatchNorm2d):
-                layer.weight.requires_grad = False
-                layer.bias.requires_grad = False
-                layer.eval()
-
         prior = 0.01
 
         self._class_head._out_conv.bias.data.fill_(math.log(prior / (1.0 - prior)))
@@ -221,6 +215,8 @@ class FCOS(nn.Module):
 
         image_height, image_width = images.shape[-2:]
 
+        #class_preds = torch.sigmoid(class_preds)
+
         class_preds = torch.sqrt(class_preds.sigmoid_() * centerness_preds.sigmoid_())  # [N, M, C]
 
         class_preds = torch.reshape(class_preds, (class_preds.shape[0], -1))  # [N, MxC]
@@ -242,6 +238,8 @@ class FCOS(nn.Module):
         box_preds = torch.reshape(box_preds, (self._max_detections, 4))  # [MD, 4]
         class_scores = torch.reshape(class_scores, (self._max_detections,))  # [MD]
         classes = torch.reshape(classes, (self._max_detections,))  # [MD]
+
+        box_preds = torch.clamp(box_preds, min=0, max=image_height)  # [MD, 4]
 
         selected_indices = torchvision.ops.nms(box_preds, class_scores, self._iou_threshold)
 

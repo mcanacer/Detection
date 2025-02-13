@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from towers import StochasticDepth
 
 
 class ConvolutionalHead(nn.Module):
@@ -23,7 +24,7 @@ class ConvolutionalHead(nn.Module):
         layers = []
         for i in range(self._num_repeats):
             layers.append(nn.Conv2d(self._filter_size, self._filter_size, kernel_size=3, stride=1, padding=1))
-            #layers.append(nn.BatchNorm2d(self._filter_size))
+            layers.append(nn.BatchNorm2d(self._filter_size))
             layers.append(nn.ReLU())
         self._out_conv = nn.Conv2d(self._filter_size, self._out_filters, kernel_size=3, stride=1, padding=1)
         return nn.Sequential(*layers)

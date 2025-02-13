@@ -55,6 +55,8 @@ class FCOSAssigner(object):
             # [N, M, T]
             matched_matrix &= (distances.max(dim=-1).values > min_range) & (distances.max(dim=-1).values < max_range)
 
+            matched_matrix &= torch.unsqueeze(gt_weights > 0, dim=1)
+
             matched_matrix = matched_matrix.to(torch.float32)
 
             # [N, T]

@@ -28,12 +28,6 @@ class FeatureExtractor(nn.Module):
         self._class_head = class_head
         self._feature_map_indexes = feature_map_indexes
 
-        for layer in self.modules():
-            if isinstance(layer, nn.BatchNorm2d):
-                layer.weight.requires_grad = False
-                layer.bias.requires_grad = False
-                layer.eval()
-
         prior = 0.01
 
         self._class_head._out_conv.bias.data.fill_(math.log(prior / (1.0 - prior)))
