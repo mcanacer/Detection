@@ -69,6 +69,7 @@ def everything(args):
     train_dataset = CocoDataset(
         args.train_dataset_dir,
         args.train_dataset_json_dir,
+        args.height,
         args.max_num_instances,
         transforms.Compose([transforms.Resize(args.height),
         transforms.CenterCrop(args.height),
@@ -81,6 +82,7 @@ def everything(args):
     eval_dataset = CocoDataset(
         args.eval_dataset_dir,
         args.eval_dataset_json_dir,
+        args.height,
         args.max_num_instances,
         transforms.Compose([transforms.Resize(args.height),
         transforms.CenterCrop(args.height),
@@ -117,7 +119,7 @@ def everything(args):
 
     assigner = FCOSAssigner(ranges)
 
-    model = FeatureExtractor(backbone, fpn, box_tower, class_tower, box_head, class_head, centerness_head, feature_map_indexes)
+    model = FeatureExtractor(backbone, fpn, class_tower, box_tower, class_head, box_head, centerness_head, feature_map_indexes)
 
     detector = FCOS(
         model,

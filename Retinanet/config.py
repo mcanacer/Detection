@@ -74,6 +74,7 @@ def everything(args):
     train_dataset = CocoDataset(
         args.train_dataset_dir,
         args.train_dataset_json_dir,
+        args.height,
         args.max_num_instances,
         transforms.Compose([transforms.Resize(args.height),
         transforms.CenterCrop(args.height),
@@ -86,6 +87,7 @@ def everything(args):
     eval_dataset = CocoDataset(
         args.eval_dataset_dir,
         args.eval_dataset_json_dir,
+        args.height,
         args.max_num_instances,
         transforms.Compose([transforms.Resize(args.height),
         transforms.CenterCrop(args.height),
@@ -105,7 +107,7 @@ def everything(args):
     box_tower = ConvolutionalTower(args.num_repeats, args.filter_size)
     class_tower = ConvolutionalTower(args.num_repeats, args.filter_size)
 
-    box_head = ConvolutionalHead(args.num_repeats, args.filter_size, out_filters=4)
+    box_head = ConvolutionalHead(args.num_repeats, args.filter_size, out_filters=args.num_anchors*4)
     class_head = ConvolutionalHead(args.num_repeats, args.filter_size, out_filters=args.num_anchors*args.num_classes)
 
     scales = [2 ** (idx/3) for idx in range(3)]

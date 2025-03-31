@@ -3,6 +3,8 @@ import importlib
 
 import os
 
+import torch
+
 
 def get_everything(config_path, args):
     module_path = config_path.replace('/', '.').replace('.py', '')
@@ -11,7 +13,7 @@ def get_everything(config_path, args):
 
 
 def main(config_path, args):
-    evy = get_everything(config_path, path)
+    evy = get_everything(config_path, args)
 
     run = evy['run']
 
@@ -49,7 +51,7 @@ def main(config_path, args):
                 }
             )
 
-            if steps % 100 == 0:
+            if step % 100 == 0:
                 torch.save(
                     {
                         'model_state_dict': detector.state_dict(),
@@ -74,5 +76,5 @@ def main(config_path, args):
 if __name__ == '__main__':
     if len(sys.argv) == 1:
         raise ValueError('you must provide config file')
-    get_everything(sys.argv[1], sys.argv[2:])
+    main(sys.argv[1], sys.argv[2:])
 

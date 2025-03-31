@@ -11,11 +11,14 @@ from pycocotools.coco import COCO
 
 class CocoDataset(torch.utils.data.Dataset):
 
-    def __init__(self,
-                 dataset_dir,
-                 annotation_file_path,
-                 image_size=416,
-                 max_num_instances=40):
+    def __init__(
+        self,
+        dataset_dir,
+        annotation_file_path,
+        image_size=512,
+        max_num_instances=40,
+        transform=None,
+    ):
 
         super(CocoDataset, self).__init__()
 
@@ -27,17 +30,7 @@ class CocoDataset(torch.utils.data.Dataset):
 
         self.ids = list(sorted(self.coco.imgs.keys()))
 
-        _transform = [
-            transforms.Resize(image_size),
-            transforms.CenterCrop(image_size),
-            #transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
-        ]
-
-        self.image_transforms = transforms.Compose(_transform)
+        self.image_transforms = transform
 
     def __len__(self):
         return len(self.ids)
@@ -128,7 +121,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
             _class: _idx for _idx, _class in enumerate(voc_classes)
         }
         self.idx_to_class = {
-            _idx: _class for _idx, _class in enumerate(voc_classes)
+            _idx + 1: _class for _idx, _class in enumerate(voc_classes)
         }
 
         self.instances = json.load(
@@ -188,9 +181,6 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         gt_boxes /= torch.tensor([self.image_size, self.image_size, self.image_size, self.image_size]).unsqueeze(0)
         gt_weights = torch.ones_like(gt_labels)
 
-        mask = area(gt_boxes) >= 0.01
-        gt_weights *= mask.unsqueeze(-1)
-
         num_pad = self._max_num_instances - gt_boxes.shape[0]
 
         gt_boxes = F.pad(gt_boxes, (0, 0, 0, num_pad))
@@ -198,3 +188,4 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         gt_weights = F.pad(gt_weights, (0, 0, 0, num_pad)).squeeze()
 
         return image, gt_boxes, gt_labels, gt_weights
+
